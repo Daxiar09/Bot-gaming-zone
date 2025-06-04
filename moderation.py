@@ -8,12 +8,18 @@ class Moderation(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.configs = {
-        }  # {guild_id: {channel_id: {"links": True, "insults": True}}}
+        self.configs = {}
         self.insults = [
-            "con", "connard", "connasse", "fdp", "ntm", "pute", "salope",
-            "enculé", "tg", "ta gueule", "batard", "bâtard", "merde", "abruti",
-            "bouffon", "pd", "putain", "chiant", "chiotte", "encule", "enculer"
+            "con", "connard", "connasse", "conne", "c*n", "c0n", "fdp",
+            "fils de pute", "filsdepute", "fils2pute", "ntm", "nique ta mère",
+            "niquetamere", "n*t*m", "tg", "ta gueule", "tagueule", "enculé",
+            "encule", "enculer", "enculė", "encul*", "encul3", "pute",
+            "putain", "put1", "puteuh", "salope", "salop", "salopard",
+            "batard", "bâtard", "batrd", "merde", "merd*", "m*rde", "abruti",
+            "abrutis", "abrutie", "bouffon", "boufon", "bouffonne", "pd",
+            "tapette", "fiotte", "chiant", "chiotte", "chié", "chier", "culé",
+            "cul", "gros con", "grosse conne", "trou du cul", "troudcul",
+            "connard de merde"
         ]
         self.insult_patterns = [
             re.compile(rf"\b{re.escape(insult)}\b", re.IGNORECASE)
@@ -70,7 +76,7 @@ class Moderation(commands.Cog):
         }
 
         await interaction.response.send_message(
-            f"✅ Configuration mise à jour pour {salon.mention} : "
+            f":check: Configuration mise à jour pour {salon.mention} : "
             f"liens = {lien.upper()}, insultes = {insultes.upper()}",
             ephemeral=True)
 
@@ -93,8 +99,8 @@ class Moderation(commands.Cog):
             if channel:
                 embed.add_field(
                     name=channel.name,
-                    value=f"Liens : {'✅' if settings['links'] else '❌'} | "
-                    f"Insultes : {'✅' if settings['insults'] else '❌'}",
+                    value=f"Liens : {'check' if settings['links'] else '❌'} | "
+                    f"Insultes : {':check' if settings['insults'] else '❌'}",
                     inline=False)
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
