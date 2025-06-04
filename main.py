@@ -11,11 +11,10 @@ import re
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
+await bot.load_extension("moderation")
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
-
-await bot.load_extension("moderation")
