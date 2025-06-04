@@ -11,10 +11,20 @@ import re
 
 load_dotenv()
 token = os.getenv('DISCORD_TOKEN')
-await bot.load_extension("moderation")
 
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"{bot.user} est connecté !")
+
+async def main():
+    keep_alive()
+    await bot.load_extension("moderation") 
+    await bot.start(token)
+
+asyncio.run(main())
