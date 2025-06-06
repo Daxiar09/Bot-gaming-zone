@@ -5,29 +5,27 @@ from dotenv import load_dotenv
 from keep_alive import keep_alive
 import asyncio
 
-keep_alive()
-
+# Charger les variables d'environnement
 load_dotenv()
-token = os.getenv('DISCORD_TOKEN')
+TOKEN = os.getenv('DISCORD_TOKEN')
 
+# Intents nécessaires
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
+# Créer le bot
 bot = commands.Bot(command_prefix="!", intents=intents)
-
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()  # Synchronise les commandes slash avec Discord
-    print(f"{bot.user} est connecté ! Les commandes slash sont synchronisées.")
-
-
+    await bot.tree.sync()  # 🔁 synchronise les commandes
+    print(f"{bot.user} est prêt.")
+      
+# Lancer le bot
 async def main():
-    async with bot:
-        await bot.load_extension("moderation"
-                                 )  # Charge ton fichier moderation.py
-        await bot.start(token)
+    await bot.load_extension("moderation")
+    await bot.start(TOKEN)
 
 
 asyncio.run(main())
