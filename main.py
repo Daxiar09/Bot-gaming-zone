@@ -19,21 +19,32 @@ intents.members = True
 intents.guilds = True
 
 # Création du bot
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=".", intents=intents)
+tree = bot.tree
 
 
 @bot.event
 async def on_ready():
     print(f"✅ Connecté en tant que {bot.user}")
+    try:
+        synced = await tree.sync()
+        print(f'Slash commands synchronisées : {len(synced)}')
+    except Exception as e:
+        print(f'Erreur de synchronisation : {e}')
 
-    # Synchroniser les commandes slash
-    if not hasattr(bot, "synced"):
-        bot.synced = True
-        try:
-            synced = await bot.tree.sync()
-            print(f"✅ {len(synced)} commandes slash synchronisées.")
-        except Exception as e:
-            print(f"❌ Erreur de synchronisation des commandes : {e}")
+
+#  préfixe .
+@bot.command()
+async def ping(ctx):
+    latency = round(bot.latency * 1000)
+    await ctx.send(f'Latence : {latency} ms')
+
+
+# slash
+@tree.command(name="ping", description="Vérifie la latence du bot")
+async def slash_ping(interaction: discord.Interaction):
+    latency = round(bot.latency * 1000)
+    await interaction.response.send_message(f'Latence : {latency} ms')
 
 
 async def main():
@@ -49,3 +60,5 @@ async def main():
 
 # Démarrage du bot
 asyncio.run(main())
+
+#lien : https://discord.com/oauth2/authorize?client_id=1379151294677385258&permissions=268446848&scope=bot+applications.commands
