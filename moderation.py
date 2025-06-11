@@ -59,10 +59,10 @@ class Moderation(commands.Cog):
                     break
 
         if deleted:
-            log_channel = self.log_channels.get(message.guild.id)
-            if log_channel:
-                channel = message.guild.get_channel(log_channel)
-                if channel:
+            log_channel_id = self.log_channels.get(message.guild.id)
+            if log_channel_id:
+                log_channel = message.guild.get_channel(log_channel_id)
+                if log_channel:
                     embed = discord.Embed(title="🚨 Message supprimé",
                                           description=message.content,
                                           color=discord.Color.red())
@@ -71,59 +71,56 @@ class Moderation(commands.Cog):
                         icon_url=message.author.display_avatar.url)
                     embed.add_field(name="Salon",
                                     value=message.channel.mention)
-                    await channel.send(embed=embed)
+                    await log_channel.send(embed=embed)
 
     def is_owner(self, ctx):
-        return ctx.author.id == ctx.guild.owner_id
+        return ctx.author == ctx.guild.owner
 
     @commands.command(name="config")
-    async def config_cmd(self, ctx, salon: discord.TextChannel, lien: str,
-                         insultes: str):
+    async def config(self, ctx, salon: discord.TextChannel, lien: str,
+                     insultes: str):
         if not self.is_owner(ctx):
             return await ctx.send(
-                "❌ Seul le créateur du serveur peut utiliser cette commande.")
-
-        gid = ctx.guild.id
-        if gid not in self.configs:
-            self.configs[gid] = {}
-
-        self.configs[gid][salon.id] = {
+                "❌ Seul le **créateur du serveur** peut utiliser cette commande."
+            )
+        guild_id = ctx.guild.id
+        if guild_id not in self.configs:
+            self.configs[guild_id] = {}
+        self.configs[guild_id][salon.id] = {
             "links": lien.lower() == "on",
             "insults": insultes.lower() == "on"
         }
-
         await ctx.send(
-            f"✅ Config mise à jour pour {salon.mention} : liens = {lien.upper()}, insultes = {insultes.upper()}"
+            f"✅ Configuration mise à jour pour {salon.mention} : liens = {lien.upper()}, insultes = {insultes.upper()}"
         )
 
     @commands.command(name="voir_configs")
-    async def voir_configs_cmd(self, ctx):
+    async def voir_configs(self, ctx):
         if not self.is_owner(ctx):
             return await ctx.send(
-                "❌ Seul le créateur du serveur peut utiliser cette commande.")
-
-        gid = ctx.guild.id
-        configs = self.configs.get(gid, {})
+                "❌ Seul le **créateur du serveur** peut utiliser cette commande."
+            )
+        configs = self.configs.get(ctx.guild.id, {})
         if not configs:
             return await ctx.send("❌ Aucune configuration définie.")
-
-        embed = discord.Embed(title="🛠️ Configurations actuelles",
+        embed = discord.Embed(title="🔧 Configurations des salons",
                               color=discord.Color.blue())
-        for cid, settings in configs.items():
-            channel = ctx.guild.get_channel(cid)
+        for channel_id, settings in configs.items():
+            channel = ctx.guild.get_channel(channel_id)
             if channel:
                 embed.add_field(
                     name=channel.name,
-                    value=
-                    f"Liens : {'✅' if settings['links'] else '❌'} | Insultes : {'✅' if settings['insults'] else '❌'}",
+                    value=f"Liens : {'✅' if settings['links'] else '❌'} | "
+                    f"Insultes : {'✅' if settings['insults'] else '❌'}",
                     inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name="config_log")
-    async def config_log_cmd(self, ctx, salon: discord.TextChannel):
+    async def config_log(self, ctx, salon: discord.TextChannel):
         if not self.is_owner(ctx):
             return await ctx.send(
-                "❌ Seul le créateur du serveur peut utiliser cette commande.")
+                "❌ Seul le **créateur du serveur** peut utiliser cette commande."
+            )
         self.log_channels[ctx.guild.id] = salon.id
         await ctx.send(f"📘 Les logs seront envoyés dans {salon.mention}.")
 
