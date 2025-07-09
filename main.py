@@ -6,7 +6,7 @@ import os
 
 intents = discord.Intents.all()
 
-bot = commands.Bot(command_prefix="GZ.", intents=intents)
+bot = commands.Bot(command_prefix="T.", intents=intents)
 
 bot.user_gemmes = {}
 bot.shop_channel_id = None
@@ -24,13 +24,11 @@ async def run_webserver():
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
 
-
 @bot.event
 async def on_ready():
     print(f"{bot.user} est prêt !")
 
-# ─── addgemmes ─────────────────────────────────────────
-@commands.command()
+@bot.command()
 async def addgemmes(ctx, membre: discord.Member, montant: int):
     if ctx.author.id != ctx.guild.owner_id:
         return await ctx.send("❌ Seul le créateur du serveur peut utiliser cette commande.")
@@ -39,9 +37,8 @@ async def addgemmes(ctx, membre: discord.Member, montant: int):
     bot.user_gemmes[user_id] = bot.user_gemmes.get(user_id, 0) + montant
     await ctx.send(f"✅ {montant} gemmes ont été ajoutées à {membre.mention}.")
 
-# ─── set salon ─────────────────────────────────────────
-@commands.command()
-async def set(ctx, param: str, salon: discord.TextChannel):
+@bot.command(name="set_salon")
+async def set_salon(ctx, param: str, salon: discord.TextChannel):
     if ctx.author.id != ctx.guild.owner_id:
         return await ctx.send("❌ Seul le créateur du serveur peut utiliser cette commande.")
     
@@ -49,9 +46,8 @@ async def set(ctx, param: str, salon: discord.TextChannel):
         bot.shop_channel_id = salon.id
         await ctx.send(f"✅ Salon défini : {salon.mention}")
     else:
-        await ctx.send("❌ Paramètre invalide. Utilise `GZ.set salon #salon`.")
+        await ctx.send("❌ Paramètre invalide. Utilise `GZ.set_salon salon #salon`.")
 
-# ─── shop ───────────────────────────────────────────────
 class ShopView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -94,14 +90,13 @@ class ShopView(discord.ui.View):
             "• Rôle personnalisé (ex: @Timcool_27) : 200 gemmes 💎",
             ephemeral=True)
 
-@commands.command()
+@bot.command()
 async def shop(ctx):
     await ctx.send("Voici les offres disponibles :", view=ShopView())
 
-# ─── Enregistrer les commandes ─────────────────────────
-bot.add_command(addgemmes)
-bot.add_command(set)
-bot.add_command(shop)
+async def main():
+    await run_webserver()
+    await bot.start(os.getenv("DISCORD_TOKEN"))
 
-# ─── Lancer le bot ─────────────────────────────────────
-bot.run(os.getenv("DISCORD_TOKEN"))
+import asyncio
+asyncio.run(main())
