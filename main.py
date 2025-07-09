@@ -1,5 +1,7 @@
 import discord
 from discord.ext import commands
+from aiohttp import web
+import asyncio
 import os
 
 intents = discord.Intents.all()
@@ -8,6 +10,20 @@ bot = commands.Bot(command_prefix="GZ.", intents=intents)
 
 bot.user_gemmes = {}
 bot.shop_channel_id = None
+
+# Serveur web minimal pour Render
+async def handle(request):
+    return web.Response(text="Bot en ligne !")
+
+async def run_webserver():
+    app = web.Application()
+    app.add_routes([web.get('/', handle)])
+    runner = web.AppRunner(app)
+    await runner.setup()
+    port = int(os.environ.get("PORT", 8080))
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+
 
 @bot.event
 async def on_ready():
