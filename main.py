@@ -87,4 +87,4 @@ bot.add_command(set)
 bot.add_command(shop)
 
 # ─── Lancer le bot ─────────────────────────────────────
-bot.run("TON_TOKEN_ICI")
+bot.run("DISCORD_TOKEN")
