@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands
+import os
 
 intents = discord.Intents.all()
 
@@ -87,4 +88,4 @@ bot.add_command(set)
 bot.add_command(shop)
 
 # ─── Lancer le bot ─────────────────────────────────────
-bot.run("DISCORD_TOKEN")
+bot.run(os.getenv("DISCORD_TOKEN"))
