@@ -5,7 +5,7 @@ import asyncio
 import os
 
 intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="GZ.", intents=intents)
+bot = commands.Bot(command_prefix="T.", intents=intents)
 
 bot.user_gemmes = {}
 bot.shop_channel_id = None
