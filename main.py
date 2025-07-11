@@ -12,13 +12,15 @@ ROLE_WW_ID = 1386397029822890114  # rôle @@Ww
 CREATOR_ID = 1089542697108377621  # créateur serveur (ping à chaque achat)
 
 bot.user_gemmes = {}
-bot.shop_channel_id = None       # salon pour notifier achats
-bot.gemmes_channel_id = None     # salon pour afficher gemmes
-bot.gemmes_message_id = None     # ID du message affichant les gemmes
+bot.shop_channel_id = None  # salon pour notifier achats
+bot.gemmes_channel_id = None  # salon pour afficher gemmes
+bot.gemmes_message_id = None  # ID du message affichant les gemmes
+
 
 # --- Serveur web pour Render ---
 async def handle(request):
     return web.Response(text="Bot en ligne !")
+
 
 async def run_webserver():
     app = web.Application()
@@ -28,6 +30,7 @@ async def run_webserver():
     port = int(os.environ.get("PORT", 8080))
     site = web.TCPSite(runner, '0.0.0.0', port)
     await site.start()
+
 
 # --- Fonction pour mettre à jour message des gemmes ---
 async def update_gemmes_message():
@@ -52,13 +55,18 @@ async def update_gemmes_message():
         content = "**Gemmes des membres :**\n" + "\n".join(lines)
     await message.edit(content=content)
 
+
 # --- Vérification : commande réservée au créateur serveur ---
 def is_guild_owner():
+
     async def predicate(ctx):
         return ctx.author.id == ctx.guild.owner_id
+
     return commands.check(predicate)
 
+
 # --- Commandes ---
+
 
 @bot.command()
 @is_guild_owner()
@@ -67,6 +75,7 @@ async def addgemmes(ctx, membre: discord.Member, montant: int):
     bot.user_gemmes[user_id] = bot.user_gemmes.get(user_id, 0) + montant
     await ctx.send(f"✅ {montant} gemmes ont été ajoutées à {membre.mention}.")
     await update_gemmes_message()
+
 
 @bot.command()
 @is_guild_owner()
@@ -78,11 +87,13 @@ async def deletegemmes(ctx, membre: discord.Member, montant: int):
     await ctx.send(f"✅ {montant} gemmes ont été retirées à {membre.mention}.")
     await update_gemmes_message()
 
+
 @bot.command(name="set_salon_offres")
 @is_guild_owner()
 async def set_salon_offres(ctx, salon: discord.TextChannel):
     bot.shop_channel_id = salon.id
     await ctx.send(f"✅ Salon des offres défini : {salon.mention}")
+
 
 @bot.command(name="set_salon_gemmes")
 @is_guild_owner()
@@ -94,11 +105,15 @@ async def set_salon_gemmes(ctx, salon: discord.TextChannel):
     await update_gemmes_message()
     await ctx.send(f"✅ Salon d'affichage des gemmes défini : {salon.mention}")
 
+
 # --- Shop ---
 
+
 class BuyButton(discord.ui.Button):
+
     def __init__(self, label, price, category):
-        super().__init__(label=f"{label} ({price}💎)", style=discord.ButtonStyle.primary)
+        super().__init__(label=f"{label} ({price}💎)",
+                         style=discord.ButtonStyle.primary)
         self.label_base = label
         self.price = price
         self.category = category  # "role" ou "other"
@@ -112,8 +127,7 @@ class BuyButton(discord.ui.Button):
         if gemmes < self.price:
             await interaction.response.send_message(
                 f"❌ Tu n'as pas assez de gemmes ({gemmes}) pour acheter cette offre (coût : {self.price})",
-                ephemeral=True
-            )
+                ephemeral=True)
             return
 
         # Deduct gems
@@ -121,7 +135,8 @@ class BuyButton(discord.ui.Button):
         await update_gemmes_message()
 
         # Répondre d'abord à l'interaction
-        await interaction.response.send_message(f"✅ Offre achetée : {self.label_base}", ephemeral=True)
+        await interaction.response.send_message(
+            f"✅ Offre achetée : {self.label_base}", ephemeral=True)
 
         # Actions selon catégorie
         if self.category == "role":
@@ -129,12 +144,15 @@ class BuyButton(discord.ui.Button):
             if self.label_base.startswith("Rôle @@Ww"):
                 role_ww = guild.get_role(ROLE_WW_ID)
                 if not role_ww:
-                    await interaction.followup.send("❌ Le rôle @@Ww n'existe pas sur ce serveur.", ephemeral=True)
+                    await interaction.followup.send(
+                        "❌ Le rôle @@Ww n'existe pas sur ce serveur.",
+                        ephemeral=True)
                     return
 
                 # Check si déjà ce rôle
                 if role_ww in member.roles:
-                    await interaction.followup.send("❌ Tu as déjà ce rôle.", ephemeral=True)
+                    await interaction.followup.send("❌ Tu as déjà ce rôle.",
+                                                    ephemeral=True)
                     return
 
                 await member.add_roles(role_ww)
@@ -147,12 +165,14 @@ class BuyButton(discord.ui.Button):
                     dur = None
 
                 if dur:
+
                     async def remove_role_later():
                         await asyncio.sleep(dur)
                         try:
                             await member.remove_roles(role_ww)
                         except:
                             pass
+
                     bot.loop.create_task(remove_role_later())
 
             elif self.label_base == "Rôle personnalisé":
@@ -160,9 +180,11 @@ class BuyButton(discord.ui.Button):
                 role_name = str(member)
                 existing_role = discord.utils.get(guild.roles, name=role_name)
                 if existing_role:
-                    await interaction.followup.send("❌ Tu as déjà un rôle personnalisé.", ephemeral=True)
+                    await interaction.followup.send(
+                        "❌ Tu as déjà un rôle personnalisé.", ephemeral=True)
                     return
-                new_role = await guild.create_role(name=role_name, colour=discord.Colour.purple())
+                new_role = await guild.create_role(
+                    name=role_name, colour=discord.Colour.purple())
                 await member.add_roles(new_role)
                 # Pas de notif dans salon offres
 
@@ -178,10 +200,12 @@ class BuyButton(discord.ui.Button):
                     # Envoyer message
                     await salon_offres.send(
                         f"{member.mention} a acheté **{self.label_base}** pour {self.price} gemmes. {creator_user.mention} {role_mention}",
-                        allowed_mentions=discord.AllowedMentions(users=True, roles=False)
-                    )
+                        allowed_mentions=discord.AllowedMentions(users=True,
+                                                                 roles=False))
+
 
 class ShopView(discord.ui.View):
+
     def __init__(self, category):
         super().__init__(timeout=None)
         self.category = category
@@ -222,20 +246,31 @@ class ShopView(discord.ui.View):
             category = "role" if "Rôle" in label else "other"
             self.add_item(BuyButton(label, price, category))
 
+
 class CategorySelect(discord.ui.View):
+
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(CategoryDropdown())
 
+
 class CategoryDropdown(discord.ui.Select):
+
     def __init__(self):
         options = [
-            discord.SelectOption(label="Edits Shorts", description="Voir les offres Edits Shorts"),
-            discord.SelectOption(label="Cache-Cache", description="Voir les offres Cache-Cache"),
-            discord.SelectOption(label="Word Record", description="Voir les offres Word Record"),
-            discord.SelectOption(label="Rôle esthétique", description="Voir les rôles esthétiques"),
+            discord.SelectOption(label="Edits Shorts",
+                                 description="Voir les offres Edits Shorts"),
+            discord.SelectOption(label="Cache-Cache",
+                                 description="Voir les offres Cache-Cache"),
+            discord.SelectOption(label="Word Record",
+                                 description="Voir les offres Word Record"),
+            discord.SelectOption(label="Rôle esthétique",
+                                 description="Voir les rôles esthétiques"),
         ]
-        super().__init__(placeholder="Choisis une catégorie...", min_values=1, max_values=1, options=options)
+        super().__init__(placeholder="Choisis une catégorie...",
+                         min_values=1,
+                         max_values=1,
+                         options=options)
 
     async def callback(self, interaction: discord.Interaction):
         category = self.values[0]
@@ -245,6 +280,7 @@ class CategoryDropdown(discord.ui.Select):
                   f"Tu as {bot.user_gemmes.get(str(interaction.user.id), 0)} gemmes."
         await interaction.response.edit_message(content=content, view=view)
 
+
 @bot.command()
 async def shop(ctx):
     gemmes = bot.user_gemmes.get(str(ctx.author.id), 0)
@@ -252,7 +288,9 @@ async def shop(ctx):
     view = CategorySelect()
     await ctx.send(content, view=view)
 
+
 # --- Event on_ready ---
+
 
 @bot.event
 async def on_ready():
@@ -260,5 +298,6 @@ async def on_ready():
     # Démarrer serveur web (Render)
     bot.loop.create_task(run_webserver())
 
+
 # --- Lancement du bot ---
-bot.run(os.environ.get("TOKEN"))
+bot.run(os.environ.get("DISCORD_TOKEN"))
