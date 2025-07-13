@@ -7,6 +7,7 @@ import os
 
 DATA_FILE = "data.json"
 
+
 def save_data():
     data = {
         "gemmes": bot.user_gemmes,
@@ -17,6 +18,7 @@ def save_data():
     with open(DATA_FILE, "w") as f:
         json.dump(data, f)
 
+
 def load_data():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r") as f:
@@ -25,6 +27,7 @@ def load_data():
             bot.shop_channel_id = data.get("salon_offres_id")
             bot.gemmes_channel_id = data.get("salon_gemmes_id")
             bot.gemmes_message_id = data.get("message_gemmes_id")
+
 
 intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="T.", intents=intents)
@@ -38,7 +41,7 @@ OWNER_ID = 1089542697108377621
 ROLE_WW_ID = 1386397029822890114
 
 
-# ───── Web server pour Render ─────
+# ───── Web server ─────
 async def handle(request):
     return web.Response(text="Bot en ligne !")
 
@@ -53,22 +56,25 @@ async def run_webserver():
     await site.start()
 
 
-# ───── Helper: Update Gemmes Message ─────
+# ───── Mise à jour message gemmes ─────
 async def update_gemmes_message():
     if bot.gemmes_channel_id and bot.gemmes_message_id:
         channel = bot.get_channel(bot.gemmes_channel_id)
-        message = await channel.fetch_message(bot.gemmes_message_id)
-        if message:
-            content = "**💎 Gemmes des membres :**\n"
-            for user_id, gemmes in bot.user_gemmes.items():
-                user = await bot.fetch_user(int(user_id))
-                content += f"{user.mention} → {gemmes} gemmes\n"
-            await message.edit(content=content)
+        try:
+            message = await channel.fetch_message(bot.gemmes_message_id)
+        except:
+            return
+        content = "**💎 Gemmes des membres :**\n"
+        for user_id, gemmes in bot.user_gemmes.items():
+            user = await bot.fetch_user(int(user_id))
+            content += f"{user.mention} → {gemmes} gemmes\n"
+        await message.edit(content=content)
 
 
-# ───── Events ─────
+# ───── Événements ─────
 @bot.event
 async def on_ready():
+    load_data()
     print(f"{bot.user} est prêt !")
 
 
@@ -81,43 +87,47 @@ def is_owner(ctx):
 async def addgemmes(ctx, membre: discord.Member, montant: int):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur du serveur peut utiliser cette commande.")
+            "❌ TU n,es pas autorisé à utiliser cette commande.")
     uid = str(membre.id)
     bot.user_gemmes[uid] = bot.user_gemmes.get(uid, 0) + montant
     await ctx.send(f"✅ {montant} gemmes ajoutées à {membre.mention}")
     await update_gemmes_message()
+    save_data()
 
 
 @bot.command()
 async def deletegemmes(ctx, membre: discord.Member, montant: int):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur du serveur peut utiliser cette commande.")
+            "❌ Seul le créateur peut utiliser cette commande.")
     uid = str(membre.id)
     bot.user_gemmes[uid] = max(0, bot.user_gemmes.get(uid, 0) - montant)
     await ctx.send(f"❌ {montant} gemmes retirées à {membre.mention}")
     await update_gemmes_message()
+    save_data()
 
 
 @bot.command()
 async def set_salon_offres(ctx, salon: discord.TextChannel):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur du serveur peut utiliser cette commande.")
+            "❌ Seul le créateur peut utiliser cette commande.")
     bot.shop_channel_id = salon.id
     await ctx.send(f"✅ Salon des offres défini : {salon.mention}")
+    save_data()
 
 
 @bot.command()
 async def set_salon_gemmes(ctx, salon: discord.TextChannel):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur du serveur peut utiliser cette commande.")
+            "❌ Seul le créateur peut utiliser cette commande.")
     msg = await salon.send("Initialisation des gemmes...")
     bot.gemmes_channel_id = salon.id
     bot.gemmes_message_id = msg.id
     await update_gemmes_message()
-    await ctx.send("✅ Message de gemmes initialisé et enregistré.")
+    await ctx.send("✅ Message de gemmes initialisé.")
+    save_data()
 
 
 # ───── Boutique ─────
@@ -127,7 +137,7 @@ class CategoryView(discord.ui.View):
         super().__init__(timeout=60)
         self.author = author
 
-    async def interaction_check(self, interaction: discord.Interaction):
+    async def interaction_check(self, interaction):
         return interaction.user == self.author
 
     @discord.ui.button(label="🎬 Edits Shorts",
@@ -156,7 +166,6 @@ class CategoryView(discord.ui.View):
                                                     self.author))
 
 
-# ───── Vues d'Achats ─────
 class OfferButton(discord.ui.Button):
 
     def __init__(self, label, price, description, callback_fn):
@@ -187,27 +196,35 @@ async def handle_offer(interaction,
                        role_duration=None,
                        create_role=False):
     uid = str(interaction.user.id)
-    if bot.user_gemmes.get(uid, 0) < price:
-        return await interaction.response.send_message(
-            "❌ Tu n'as pas assez de gemmes !", ephemeral=True)
 
-    bot.user_gemmes[uid] -= price
-    await update_gemmes_message()
+    if bot.user_gemmes.get(uid, 0) < price:
+        await interaction.response.send_message(
+            "❌ Tu n'as pas assez de gemmes !", ephemeral=True)
+        return
+
+    guild = interaction.guild
 
     if is_role:
-        guild = interaction.guild
         if create_role:
-            role = await guild.create_role(
-                name=interaction.user.name,  
-                colour=discord.Colour(0x8e44ad),  
-                mentionable=False  
-            )
+            existing = discord.utils.get(guild.roles,
+                                         name=interaction.user.name)
+            if existing:
+                await interaction.response.send_message(
+                    "❌ Tu as déjà un rôle personnalisé.", ephemeral=True)
+                return
+            role = await guild.create_role(name=interaction.user.name,
+                                           colour=discord.Colour(0x8e44ad),
+                                           mentionable=False)
         else:
-            role_name = "@@Ww"
-            role = discord.utils.get(guild.roles, name=role_name)
+            role = discord.utils.get(guild.roles, name="@@Ww")
             if role in interaction.user.roles:
-                return await interaction.response.send_message(
+                await interaction.response.send_message(
                     "❌ Tu as déjà ce rôle.", ephemeral=True)
+                return
+
+        bot.user_gemmes[uid] -= price
+        await update_gemmes_message()
+        save_data()
 
         await interaction.user.add_roles(role)
         await interaction.response.send_message(
@@ -216,18 +233,20 @@ async def handle_offer(interaction,
         if role_duration:
             await asyncio.sleep(role_duration)
             await interaction.user.remove_roles(role)
-
     else:
+        bot.user_gemmes[uid] -= price
+        await update_gemmes_message()
+        save_data()
+
         salon = bot.get_channel(bot.shop_channel_id)
         if salon:
             await salon.send(
-                f"{interaction.user.mention} a acheté : **{description}**\n<@{OWNER_ID}>"
+                f"{interaction.user.mention} a acheté : **{description}**\n<@&{ROLE_WW_ID}>"
             )
         await interaction.response.send_message("✅ Offre achetée !",
                                                 ephemeral=True)
 
 
-# ───── Vues spécifiques ─────
 class ShortsOffersView(BaseOffersView):
 
     def __init__(self, author):
@@ -266,12 +285,12 @@ class RoleOffersView(BaseOffersView):
             OfferButton(
                 "Ww (1 semaine)", 20, "Rôle @@Ww - 1 semaine",
                 lambda i, p, d: handle_offer(
-                    i, p, d, is_role=True, role_duration=7 * 24 * 60 * 60)))
+                    i, p, d, is_role=True, role_duration=7 * 24 * 3600)))
         self.add_item(
             OfferButton(
                 "Ww (1 mois)", 50, "Rôle @@Ww - 1 mois",
                 lambda i, p, d: handle_offer(
-                    i, p, d, is_role=True, role_duration=30 * 24 * 60 * 60)))
+                    i, p, d, is_role=True, role_duration=30 * 24 * 3600)))
         self.add_item(
             OfferButton("Ww (permanent)", 100, "Rôle @@Ww - permanent",
                         lambda i, p, d: handle_offer(i, p, d, is_role=True)))
@@ -281,7 +300,6 @@ class RoleOffersView(BaseOffersView):
                 handle_offer(i, p, d, is_role=True, create_role=True)))
 
 
-# ───── Commande publique ─────
 @bot.command()
 async def shop(ctx):
     uid = str(ctx.author.id)
@@ -289,11 +307,6 @@ async def shop(ctx):
     await ctx.send(f"Tu as **{gemmes} gemmes**.\nChoisis une catégorie :",
                    view=CategoryView(ctx.author))
 
-#────────────────────────
-@bot.event
-async def on_ready():
-    load_data()
-    print(f"{bot.user} est prêt !")
 
 # ───── Lancement ─────
 async def main():
