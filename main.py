@@ -87,7 +87,7 @@ def is_owner(ctx):
 async def addgemmes(ctx, membre: discord.Member, montant: int):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ TU n,es pas autorisé à utiliser cette commande.")
+            "❌ TU n'es pas autorisé à utiliser cette commande.")
     uid = str(membre.id)
     bot.user_gemmes[uid] = bot.user_gemmes.get(uid, 0) + montant
     await ctx.send(f"✅ {montant} gemmes ajoutées à {membre.mention}")
@@ -111,7 +111,7 @@ async def deletegemmes(ctx, membre: discord.Member, montant: int):
 async def set_salon_offres(ctx, salon: discord.TextChannel):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur peut utiliser cette commande.")
+            "❌ Tu n'es pas autorisé à utiliser cette commande.")
     bot.shop_channel_id = salon.id
     await ctx.send(f"✅ Salon des offres défini : {salon.mention}")
     save_data()
@@ -121,7 +121,7 @@ async def set_salon_offres(ctx, salon: discord.TextChannel):
 async def set_salon_gemmes(ctx, salon: discord.TextChannel):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur peut utiliser cette commande.")
+            "❌ Tu n'es pas autorisé à utiliser cette commande.")
     msg = await salon.send("Initialisation des gemmes...")
     bot.gemmes_channel_id = salon.id
     bot.gemmes_message_id = msg.id
@@ -189,12 +189,7 @@ class BaseOffersView(discord.ui.View):
         return interaction.user == self.author
 
 
-async def handle_offer(interaction,
-                       price,
-                       description,
-                       is_role=False,
-                       role_duration=None,
-                       create_role=False):
+async def handle_offer(interaction, price, description, **kwargs):
     uid = str(interaction.user.id)
 
     if bot.user_gemmes.get(uid, 0) < price:
@@ -202,49 +197,18 @@ async def handle_offer(interaction,
             "❌ Tu n'as pas assez de gemmes !", ephemeral=True)
         return
 
-    guild = interaction.guild
+    bot.user_gemmes[uid] -= price
+    await update_gemmes_message()
+    save_data()
 
-    if is_role:
-        if create_role:
-            existing = discord.utils.get(guild.roles,
-                                         name=interaction.user.name)
-            if existing:
-                await interaction.response.send_message(
-                    "❌ Tu as déjà un rôle personnalisé.", ephemeral=True)
-                return
-            role = await guild.create_role(name=interaction.user.name,
-                                           colour=discord.Colour(0x8e44ad),
-                                           mentionable=False)
-        else:
-            role = discord.utils.get(guild.roles, name="@@Ww")
-            if role in interaction.user.roles:
-                await interaction.response.send_message(
-                    "❌ Tu as déjà ce rôle.", ephemeral=True)
-                return
+    salon = bot.get_channel(bot.shop_channel_id)
+    if salon:
+        await salon.send(
+            f"{interaction.user.mention} a acheté : **{description}**\n<@{OWNER_ID}> <@&{ROLE_WW_ID}>"
+        )
 
-        bot.user_gemmes[uid] -= price
-        await update_gemmes_message()
-        save_data()
-
-        await interaction.user.add_roles(role)
-        await interaction.response.send_message(
-            "✅ Offre achetée. Rôle ajouté !", ephemeral=True)
-
-        if role_duration:
-            await asyncio.sleep(role_duration)
-            await interaction.user.remove_roles(role)
-    else:
-        bot.user_gemmes[uid] -= price
-        await update_gemmes_message()
-        save_data()
-
-        salon = bot.get_channel(bot.shop_channel_id)
-        if salon:
-            await salon.send(
-                f"{interaction.user.mention} a acheté : **{description}**\n<@&{ROLE_WW_ID}>"
-            )
-        await interaction.response.send_message("✅ Offre achetée !",
-                                                ephemeral=True)
+    await interaction.response.send_message("✅ Offre achetée !",
+                                            ephemeral=True)
 
 
 class ShortsOffersView(BaseOffersView):
@@ -282,22 +246,15 @@ class RoleOffersView(BaseOffersView):
     def __init__(self, author):
         super().__init__(author)
         self.add_item(
-            OfferButton(
-                "Ww (1 semaine)", 20, "Rôle @@Ww - 1 semaine",
-                lambda i, p, d: handle_offer(
-                    i, p, d, is_role=True, role_duration=7 * 24 * 3600)))
+            OfferButton("Ww (1 semaine)", 20, "Rôle @@Ww - 1 semaine",
+                        handle_offer))
         self.add_item(
-            OfferButton(
-                "Ww (1 mois)", 50, "Rôle @@Ww - 1 mois",
-                lambda i, p, d: handle_offer(
-                    i, p, d, is_role=True, role_duration=30 * 24 * 3600)))
+            OfferButton("Ww (1 mois)", 50, "Rôle @@Ww - 1 mois", handle_offer))
         self.add_item(
             OfferButton("Ww (permanent)", 100, "Rôle @@Ww - permanent",
-                        lambda i, p, d: handle_offer(i, p, d, is_role=True)))
+                        handle_offer))
         self.add_item(
-            OfferButton(
-                "Rôle perso", 200, "Rôle personnalisé", lambda i, p, d:
-                handle_offer(i, p, d, is_role=True, create_role=True)))
+            OfferButton("Rôle perso", 200, "Rôle personnalisé", handle_offer))
 
 
 @bot.command()
