@@ -1,3 +1,4 @@
+# main.py
 import json
 import discord
 from discord.ext import commands, tasks
@@ -37,11 +38,9 @@ bot.shop_channel_id = None
 bot.gemmes_channel_id = None
 bot.gemmes_message_id = None
 
-OWNER_ID = 1089542697108377621
-ROLE_WW_ID = 1386397029822890114
+OWNER_IDS = [1089542697108377621, 1183814362364911707]
 
 
-# ───── Web server ─────
 async def handle(request):
     return web.Response(text="Bot en ligne !")
 
@@ -56,7 +55,6 @@ async def run_webserver():
     await site.start()
 
 
-# ───── Mise à jour message gemmes ─────
 async def update_gemmes_message():
     if bot.gemmes_channel_id and bot.gemmes_message_id:
         channel = bot.get_channel(bot.gemmes_channel_id)
@@ -71,23 +69,21 @@ async def update_gemmes_message():
         await message.edit(content=content)
 
 
-# ───── Événements ─────
 @bot.event
 async def on_ready():
     load_data()
     print(f"{bot.user} est prêt !")
 
 
-# ───── Commandes Owner ─────
 def is_owner(ctx):
-    return ctx.author.id == OWNER_ID
+    return ctx.author.id in OWNER_IDS
 
 
 @bot.command()
 async def addgemmes(ctx, membre: discord.Member, montant: int):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ TU n'es pas autorisé à utiliser cette commande.")
+            "❌ Tu n'es pas autorisé à utiliser cette commande.")
     uid = str(membre.id)
     bot.user_gemmes[uid] = bot.user_gemmes.get(uid, 0) + montant
     await ctx.send(f"✅ {montant} gemmes ajoutées à {membre.mention}")
@@ -99,7 +95,7 @@ async def addgemmes(ctx, membre: discord.Member, montant: int):
 async def deletegemmes(ctx, membre: discord.Member, montant: int):
     if not is_owner(ctx):
         return await ctx.send(
-            "❌ Seul le créateur peut utiliser cette commande.")
+            "❌ Tu n'es pas autorisé à utiliser cette commande.")
     uid = str(membre.id)
     bot.user_gemmes[uid] = max(0, bot.user_gemmes.get(uid, 0) - montant)
     await ctx.send(f"❌ {montant} gemmes retirées à {membre.mention}")
@@ -130,7 +126,6 @@ async def set_salon_gemmes(ctx, salon: discord.TextChannel):
     save_data()
 
 
-# ───── Boutique ─────
 class CategoryView(discord.ui.View):
 
     def __init__(self, author):
@@ -168,15 +163,30 @@ class CategoryView(discord.ui.View):
 
 class OfferButton(discord.ui.Button):
 
-    def __init__(self, label, price, description, callback_fn):
+    def __init__(self, label, price, description):
         super().__init__(label=f"{label} ({price}💎)",
                          style=discord.ButtonStyle.primary)
         self.price = price
         self.description = description
-        self.callback_fn = callback_fn
 
     async def callback(self, interaction):
-        await self.callback_fn(interaction, self.price, self.description)
+        uid = str(interaction.user.id)
+        if bot.user_gemmes.get(uid, 0) < self.price:
+            await interaction.response.send_message(
+                "❌ Tu n'as pas assez de gemmes !", ephemeral=True)
+            return
+
+        bot.user_gemmes[uid] -= self.price
+        await update_gemmes_message()
+        save_data()
+
+        salon = bot.get_channel(bot.shop_channel_id)
+        if salon:
+            await salon.send(
+                f"{interaction.user.mention} a acheté : **{self.description}** <@1089542697108377621>"
+            )
+        await interaction.response.send_message("✅ Offre achetée !",
+                                                ephemeral=True)
 
 
 class BaseOffersView(discord.ui.View):
@@ -189,56 +199,36 @@ class BaseOffersView(discord.ui.View):
         return interaction.user == self.author
 
 
-async def handle_offer(interaction, price, description, **kwargs):
-    uid = str(interaction.user.id)
-
-    if bot.user_gemmes.get(uid, 0) < price:
-        await interaction.response.send_message(
-            "❌ Tu n'as pas assez de gemmes !", ephemeral=True)
-        return
-
-    bot.user_gemmes[uid] -= price
-    await update_gemmes_message()
-    save_data()
-
-    salon = bot.get_channel(bot.shop_channel_id)
-    if salon:
-        await salon.send(
-            f"{interaction.user.mention} a acheté : **{description}**\n<@{OWNER_ID}> <@&{ROLE_WW_ID}>"
-        )
-
-    await interaction.response.send_message("✅ Offre achetée !",
-                                            ephemeral=True)
-
-
 class ShortsOffersView(BaseOffersView):
 
     def __init__(self, author):
         super().__init__(author)
-        self.add_item(OfferButton("1 clip", 80, "Edit 1 clip", handle_offer))
-        self.add_item(OfferButton("2 clips", 110, "Edit 2 clips",
-                                  handle_offer))
+        self.add_item(OfferButton("1 clip", 80, "Edit pour 1 clip"))
+        self.add_item(OfferButton("2 clips", 110, "Edit pour 2 clips"))
+        self.add_item(
+            OfferButton("1 clip (choix musique)", 90,
+                        "Edit 1 clip avec choix musique"))
+        self.add_item(
+            OfferButton("2 clips (choix musique)", 120,
+                        "Edit 2 clips avec choix musique"))
 
 
 class CacheCacheOffersView(BaseOffersView):
 
     def __init__(self, author):
         super().__init__(author)
-        self.add_item(
-            OfferButton("4 manches", 150, "Cache-cache 4 manches",
-                        handle_offer))
-        self.add_item(
-            OfferButton("6 manches", 200, "Cache-cache 6 manches",
-                        handle_offer))
+        self.add_item(OfferButton("4 manches", 150, "Cache-cache 4 manches"))
+        self.add_item(OfferButton("6 manches", 200, "Cache-cache 6 manches"))
+        self.add_item(OfferButton("8 manches", 250, "Cache-cache 8 manches"))
 
 
 class WROffersView(BaseOffersView):
 
     def __init__(self, author):
         super().__init__(author)
-        self.add_item(OfferButton("1 essai", 100, "WR 1 essai", handle_offer))
-        self.add_item(OfferButton("2 essais", 170, "WR 2 essais",
-                                  handle_offer))
+        self.add_item(OfferButton("1 essai", 100, "WR 1 essai"))
+        self.add_item(OfferButton("2 essais", 170, "WR 2 essais"))
+        self.add_item(OfferButton("3 essais", 230, "WR 3 essais"))
 
 
 class RoleOffersView(BaseOffersView):
@@ -246,15 +236,15 @@ class RoleOffersView(BaseOffersView):
     def __init__(self, author):
         super().__init__(author)
         self.add_item(
-            OfferButton("Ww (1 semaine)", 20, "Rôle @@Ww - 1 semaine",
-                        handle_offer))
+            OfferButton("Rôle @@Ww (1 semaine)", 40,
+                        "Rôle @@Ww pendant 1 semaine"))
         self.add_item(
-            OfferButton("Ww (1 mois)", 50, "Rôle @@Ww - 1 mois", handle_offer))
+            OfferButton("Rôle @@Ww (1 mois)", 80, "Rôle @@Ww pendant 1 mois"))
         self.add_item(
-            OfferButton("Ww (permanent)", 100, "Rôle @@Ww - permanent",
-                        handle_offer))
+            OfferButton("Rôle @@Ww (permanent)", 180, "Rôle @@Ww permanent"))
         self.add_item(
-            OfferButton("Rôle perso", 200, "Rôle personnalisé", handle_offer))
+            OfferButton("Rôle personnalisé", 300,
+                        "Rôle personnalisé à votre nom"))
 
 
 @bot.command()
@@ -265,7 +255,6 @@ async def shop(ctx):
                    view=CategoryView(ctx.author))
 
 
-# ───── Lancement ─────
 async def main():
     await run_webserver()
     await bot.start(os.getenv("DISCORD_TOKEN"))
